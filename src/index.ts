@@ -13,6 +13,6 @@ export const setup = (storeAdapter: StoreAdapter<any>) => {
 };
 
 export const getConfig = () => {
-  if (!config) throw new Error("Setup config before use");
+  if (!config) throw new Error("Call setup before using config");
   return config;
 };

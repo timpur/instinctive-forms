@@ -1,6 +1,4 @@
-import { FormValidation, TPrimitive, FormErrors, FormFilters } from "../types";
-
-// import * as dotProp from "dot-prop-immutable";
+import { FormValidation, TPrimitive, FormErrors, FormFilters } from "./types";
 
 // ---- Helpers ---- //
 export const isNullOrUndefined = value => value === null || value === undefined;
@@ -26,21 +24,31 @@ export const runFilters: (filters: FormFilters, value: TPrimitive) => TPrimitive
 export const valueChanged = (a: any, b: any) => a !== b;
 export const arrayChanged = (a: any[], b: any[]) => {
   if ((a && !b) || (!a && b)) return true;
-  else if (isArray(a) && isArray(b)) return a.some((item, index) => valueChanged(item, b[index]));
-  else return false;
+  else if (isArray(a) && isArray(b)) {
+    if (a.length !== b.length) return true;
+    return a.some((item, index) => valueChanged(item, b[index]));
+  } else return false;
+};
+export const objectChanged = (a: object, b: object) => {
+  if ((a && !b) || (!a && b)) return true;
+  else if (isObject(a) && isObject(b)) {
+    const keys = [...Object.keys(a), ...Object.keys(b)];
+    return keys.some(key => valueChanged(a[key], b[key]));
+  }
+  return false;
 };
 
 export class ChangeDetection<T = any> {
   private previousValue;
-  private validator = (a: T, b: T) => a !== b;
+  private changed: (a: T, b: T) => boolean;
 
-  constructor(initialValue: T = null, validator?: (a: T, b: T) => boolean) {
+  constructor(initialValue: T = null, changed: (a: T, b: T) => boolean = valueChanged) {
     this.previousValue = initialValue;
-    if (validator) this.validator = validator;
+    this.changed = changed;
   }
 
   check(value: T) {
-    if (this.validator(this.previousValue, value)) {
+    if (this.changed(this.previousValue, value)) {
       this.previousValue = value;
       return true;
     }
@@ -48,13 +56,17 @@ export class ChangeDetection<T = any> {
   }
 }
 
-// Needed ?
+export type RenderChildren<P = object, R = any> = (props: P) => R;
+export const renderChildrenWithProps = <P = {}>(children: RenderChildren | Array<RenderChildren>, props: P) => {
+  const mapChild = child => {
+    if (typeof child === "function") return child(props);
+    return child;
+  };
 
-// ---- Types ---- //
-// export type ElementEvent<TElement = HTMLElement> = Event & { target: TElement };
+  if (!children) return null;
+  return Array.isArray(children) ? children.map(mapChild) : mapChild(children);
+};
 
-// export const valueChangedKey = (a: any, b: any, path: string) =>
-//   valueChanged(dotProp.get(a, path), dotProp.get(b, path));
-
-// export const getValueFromEvent = (e: ElementEvent<any>) => e.target.value;
-// export const getValueFromEventBind = (cb: (value: any) => any) => (e: ElementEvent<any>) => cb(getValueFromEvent(e));
+export const validateNameProp = name => {
+  if (name.indexOf(".") !== -1) throw new Error("Name must not be a path");
+};

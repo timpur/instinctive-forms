@@ -1,23 +1,24 @@
-import { createElement, Fragment, Component, createContext, Context } from "react";
-import { Callback, FormSubscription, TStoreValue } from "../types";
+import { createElement, Fragment, Component, createContext, Context, ReactNode, ComponentType } from "react";
+import { Callback, FormSubscription, TStoreValue, Omit } from "../types";
 import { StoreContext } from "../core/StoreContext";
-import { buildPath } from "../helpers";
-import { renderChildrenWithProps, Child, HOC } from "./helpers";
+import { buildPath, renderChildrenWithProps, RenderChildren, validateNameProp } from "../helpers";
 import { getConfig } from "../index";
 import { Subscription, connectSubscription } from "../core/Subscription";
 import { StoreConnect } from "../core/StoreAdapter";
 import { StoreUtils } from "../core/StoreUtils";
 import { ERRORS_KEY } from "../constants";
 
+export type HOC<N> = <P extends N, R = Omit<P, keyof N>>(Component: ComponentType<P>) => ComponentType<R>;
+
 export interface IFormContext {
-  name: string;
+  type: string;
   parent: IFormContext;
   path: string;
   subscription: FormSubscription;
 }
 
 export const FormContext: Context<IFormContext> = createContext({
-  name: null,
+  type: null,
   parent: null,
   path: null,
   subscription: null
@@ -32,8 +33,11 @@ export interface IFormProps {
 export class Form extends Component<IFormProps, {}> {
   private subscription: FormSubscription;
 
-  constructor(props: any, context: any) {
-    super(props, context);
+  constructor(...args: [any, any]) {
+    super(...args);
+
+    if (this.context.type) throw new Error("Form can not be place within a form, use Fieldset.");
+    validateNameProp(this.props.name);
     this.subscription = new Subscription();
   }
 
@@ -48,9 +52,9 @@ export class Form extends Component<IFormProps, {}> {
     return (
       <FormContext.Provider
         value={{
-          name: "form",
+          type: "form",
           parent: null,
-          path: path || name,
+          path: buildPath(path, name),
           subscription: this.subscription
         }}
       >
@@ -60,28 +64,31 @@ export class Form extends Component<IFormProps, {}> {
       </FormContext.Provider>
     );
   }
+
+  static contextType = FormContext;
 }
 
-export interface IFieldSetProps {
+export interface IFieldsetProps {
   name: string;
   path?: string;
 }
 
-export class FieldSet extends Component<IFieldSetProps, {}> {
+export class Fieldset extends Component<IFieldsetProps, {}> {
   private subscription: FormSubscription;
-  private unsubscribe: Callback;
+  private unsubscribeFromForm: Callback;
 
-  constructor(props: any, context: any) {
-    super(props, context);
+  constructor(...args: [any, any]) {
+    super(...args);
 
+    if (!this.context.type) throw new Error("Fieldset must be rendered within a Form.");
+    validateNameProp(this.props.name);
     this.subscription = new Subscription();
-
     const { subscription } = this.context as IFormContext;
-    this.unsubscribe = connectSubscription(subscription, this.subscription);
+    this.unsubscribeFromForm = connectSubscription(subscription, this.subscription);
   }
 
   componentWillUnmount() {
-    this.unsubscribe();
+    this.unsubscribeFromForm();
   }
 
   getPath = () => {
@@ -92,10 +99,11 @@ export class FieldSet extends Component<IFieldSetProps, {}> {
 
   render() {
     const path = this.getPath();
+    const { name } = this.props;
     return (
       <FormContext.Provider
         value={{
-          name: "fieldset",
+          type: "fieldset",
           parent: this.context,
           path,
           subscription: this.subscription
@@ -116,32 +124,45 @@ export interface IFormChildProps extends IFormContext {
 }
 
 export interface IFormConsumerProps {
-  children: Child<IFormChildProps>;
+  children: RenderChildren<IFormChildProps, ReactNode>;
 }
 export class FormConsumer extends Component<IFormConsumerProps, {}> {
-  private unsubscribe: Callback;
+  private unsubscribeFromStore: Callback;
 
   constructor(...args: [any, any]) {
     super(...args);
 
-    const store = getConfig().storeAdapter;
+    if (!this.context.type) throw new Error("FormConsumer must be rendered within a Form.");
     const { path } = this.context as IFormContext;
-    this.unsubscribe = StoreConnect(store, () => this.forceUpdate(), () => store.get(path));
+    this.connectToStore(path);
   }
 
-  componentWillUnmount = () => {
-    this.unsubscribe();
+  componentWillUnmount() {
+    this.unsubscribeFromStore();
+  }
+
+  componentWillReceiveProps(nextProps: IFormConsumerProps, nextContext: IFormContext) {
+    if (this.context.path !== nextContext.path) {
+      const { path } = nextContext;
+      this.connectToStore(path);
+    }
+  }
+
+  connectToStore = path => {
+    if (this.unsubscribeFromStore) this.unsubscribeFromStore();
+    const store = getConfig().storeAdapter;
+    this.unsubscribeFromStore = StoreConnect(store, () => this.forceUpdate(), path);
   };
 
   render() {
-    const { name, parent, path, subscription } = this.context as IFormContext;
+    const { type, parent, path, subscription } = this.context as IFormContext;
     const context = new StoreContext(path);
     const contextState = context.state();
     const contextInError = StoreUtils.findPropFormChildren(contextState, ERRORS_KEY).some(item => !!item.value);
     return (
       <Fragment>
         {renderChildrenWithProps<IFormChildProps>(this.props.children, {
-          name,
+          type,
           parent,
           path,
           subscription,

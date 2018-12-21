@@ -1,5 +1,5 @@
 import { TStoreValue, Callback, Selector } from "../types";
-import { ChangeDetection } from "../helpers";
+import { ChangeDetection, objectChanged } from "../helpers";
 
 export interface IStoreAdapter<TState = {}> {
   state(): TState;
@@ -11,7 +11,7 @@ export interface IStoreAdapter<TState = {}> {
 
 export abstract class StoreAdapter<TState = {}> implements IStoreAdapter<TState> {
   abstract state(): TState;
-  abstract subscribe(fn: Function): Callback;
+  abstract subscribe(cb: Callback): Callback;
 
   abstract _get(path: string, defaultValue?: TStoreValue): TStoreValue;
   abstract _set(path: string, value: TStoreValue);
@@ -35,10 +35,16 @@ export abstract class StoreAdapter<TState = {}> implements IStoreAdapter<TState>
   }
 }
 
-export const StoreConnect = (storeAdapter: StoreAdapter, update: Callback, selector: Selector) => {
-  const changeDetection = new ChangeDetection();
+export const StoreConnect = (storeAdapter: StoreAdapter, update: Callback, ...paths: string[]) => {
+  const getCurrentState: Selector<object> = () =>
+    paths
+      .map(path => [path, storeAdapter.get(path)])
+      .reduce((state, [path, value]) => {
+        state[path as string] = value;
+        return state;
+      }, {});
+  const changeDetection = new ChangeDetection(getCurrentState(), objectChanged);
   return storeAdapter.subscribe(() => {
-    const currentState = selector();
-    if (changeDetection.check(currentState)) update();
+    if (changeDetection.check(getCurrentState())) update();
   });
 };

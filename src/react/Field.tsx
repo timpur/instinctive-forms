@@ -1,10 +1,17 @@
-import { createElement, Component, Fragment } from "react";
+import { createElement, Component, Fragment, ReactNode } from "react";
 import { FormContext, IFormContext } from "./Form";
 import { Callback, TPrimitive, FormValidationType, FormValidations, FormErrors, FormFilters } from "../types";
 import { getConfig } from "../index";
 import { StoreConnect } from "../core/StoreAdapter";
-import { buildPath, runValidation, runFilters, arrayChanged } from "../helpers";
-import { renderChildrenWithProps, Child } from "./helpers";
+import {
+  buildPath,
+  runValidation,
+  runFilters,
+  arrayChanged,
+  RenderChildren,
+  renderChildrenWithProps,
+  validateNameProp
+} from "../helpers";
 import { ERRORS_KEY } from "../constants";
 
 export interface IFieldChildProps {
@@ -13,6 +20,7 @@ export interface IFieldChildProps {
   value: TPrimitive;
   errors: FormErrors;
   onChange: Callback<[TPrimitive]>;
+  onBlur: Callback;
 }
 
 export interface IFieldProps {
@@ -23,42 +31,57 @@ export interface IFieldProps {
   onSubmitValidation?: FormValidations;
   filters?: FormFilters;
   disabled?: boolean;
-  children: Child<IFieldChildProps>;
+  children?: RenderChildren<IFieldChildProps, ReactNode>;
 }
 
 export class Field extends Component<IFieldProps, {}> {
-  private unsubscribe: Callback[] = [];
+  private unsubscribeFromStore: Callback;
+  private unsubscribeFromForm: Callback;
 
   constructor(...args: [any, any]) {
     super(...args);
 
-    if (this.props.name.indexOf(".") !== -1) throw new Error("Name must be of valid format");
-
-    const store = getConfig().storeAdapter;
+    if (!this.context.type) throw new Error("Field must be rendered within a Form.");
+    validateNameProp(this.props.name);
+    this.connectToStore();
     const { subscription } = this.context as IFormContext;
-
-    this.unsubscribe.push(StoreConnect(store, () => this.forceUpdate(), () => store.get(this.getPath())));
-    this.unsubscribe.push(subscription.subscribe(this.onSubscriptionEvent));
+    this.unsubscribeFromForm = subscription.subscribe(event => this.setValidationErrorsIfChanged(event));
   }
 
-  componentWillUnmount = () => {
-    this.unsubscribe.forEach(cb => cb());
-  };
-
-  componentWillReceiveProps(nextProps: IFieldProps) {
+  componentWillReceiveProps(nextProps: IFieldProps, nextContext: IFormContext) {
+    if (this.getPath() !== this.getPath(nextProps, nextContext)) {
+      this.connectToStore(nextProps, nextContext);
+    }
     if (this.props.disabled !== nextProps.disabled) {
       this.setValidationErrorsIfChanged();
     }
   }
 
-  getPath = () => {
-    const { path, name } = this.props;
-    const { path: contextPath } = this.context as IFormContext;
+  componentWillUnmount = () => {
+    this.unsubscribeFromStore();
+    this.unsubscribeFromForm();
+  };
+
+  connectToStore = (props: IFieldProps = this.props, context: IFormContext = this.context) => {
+    if (this.unsubscribeFromStore) this.unsubscribeFromStore();
+    const store = getConfig().storeAdapter;
+    this.unsubscribeFromStore = StoreConnect(
+      store,
+      () => this.forceUpdate(),
+      this.getPath(props, context),
+      this.getErrorPath(props, context)
+    );
+  };
+
+  getPath = (props: IFieldProps = this.props, context: IFormContext = this.context) => {
+    const { path, name } = props;
+    const { path: contextPath } = context;
     return buildPath(path || contextPath, name);
   };
-  getErrorPath = () => {
-    const { path, name } = this.props;
-    const { path: contextPath } = this.context as IFormContext;
+
+  getErrorPath = (props: IFieldProps = this.props, context: IFormContext = this.context) => {
+    const { path, name } = props;
+    const { path: contextPath } = context;
     return buildPath(path || contextPath, ERRORS_KEY, name);
   };
 
@@ -70,8 +93,8 @@ export class Field extends Component<IFieldProps, {}> {
     store.setPaths([{ path: this.getPath(), value: value }, { path: this.getErrorPath(), value: errors }]);
   };
 
-  onSubscriptionEvent = (event: FormValidationType) => {
-    this.setValidationErrorsIfChanged(event);
+  onBlur = () => {
+    this.setValidationErrorsIfChanged("onBlur");
   };
 
   setValidationErrorsIfChanged = (type: FormValidationType = "onChange") => {
@@ -114,7 +137,8 @@ export class Field extends Component<IFieldProps, {}> {
           errorPath,
           value,
           errors,
-          onChange: this.onChange
+          onChange: this.onChange,
+          onBlur: this.onBlur
         })}
       </Fragment>
     );

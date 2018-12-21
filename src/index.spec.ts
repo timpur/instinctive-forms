@@ -1,21 +1,9 @@
 import { setup, getConfig } from "./index";
-import { StoreAdapter } from "./core/StoreAdapter";
-import { TStoreValue } from "./types";
+import { TestAdapter } from "../tests/TestAdapter";
 
-class TestAdapter extends StoreAdapter {
-  private _state = {};
-  state = () => this._state;
-  connectWithStoreState = null;
-
-  _get = (path: string) => this.state[path];
-  _set = (path: string, value: TStoreValue) => (this.state[path] = value);
-  _merge = (path: string, value: object | []) => this._set(path, value);
-  _setPaths = (paths: Array<{ path: string; value: TStoreValue }>) => {
-    for (const { path, value } of paths) {
-      this._set(path, value);
-    }
-  };
-}
+it("should throw error if not setup", () => {
+  expect(() => getConfig()).toThrowError("Call setup before using config");
+});
 
 it("should set config", () => {
   setup(null);

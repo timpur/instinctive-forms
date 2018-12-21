@@ -1,0 +1,58 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`FieldSet should render from, fieldset and children 1`] = `
+<form
+  name="form"
+  onSubmit={[Function]}
+>
+  <fieldset
+    name="fieldset"
+  >
+    <p>
+      test
+    </p>
+  </fieldset>
+</form>
+`;
+
+exports[`Form Consumer should pass context via HOC 1`] = `
+<form
+  name="form"
+  onSubmit={[Function]}
+>
+  <fieldset
+    name="fieldset"
+  >
+    <div>
+      test component: 
+      bla
+    </div>
+  </fieldset>
+</form>
+`;
+
+exports[`Form Consumer should render form, fieldset, consumer and child 1`] = `
+<form
+  name="form"
+  onSubmit={[Function]}
+>
+  <fieldset
+    name="fieldset"
+  >
+    <p>
+      test
+    </p>
+  </fieldset>
+</form>
+`;
+
+exports[`Form should render from and children 1`] = `
+<form
+  name="form"
+  onSubmit={[Function]}
+>
+  <p>
+    test
+  </p>
+</form>
+`;

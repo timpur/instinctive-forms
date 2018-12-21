@@ -1,5 +1,10 @@
 import { Subscription, Subscriber } from "./core/Subscription";
 
+// Base Types
+export type Key = string | number | symbol;
+export type Diff<T extends Key, U extends Key> = ({ [P in T]: P } & { [P in U]: never } & { [x: string]: never })[T];
+export type Omit<T, K extends keyof T> = Pick<T, Diff<keyof T, K>>;
+
 export type TPrimitive = object | [] | string | number | boolean | null | undefined;
 export type TStoreValue = TPrimitive;
 
@@ -15,8 +20,3 @@ export type FormFilters = Array<FormFilter>;
 
 export type Callback<TArgs extends any[] = []> = (...args: TArgs) => void;
 export type Selector<TReturn = any, TArgs extends any[] = []> = (...args: TArgs) => TReturn;
-
-// Base Types
-export type Key = string | number | symbol;
-export type Diff<T extends Key, U extends Key> = ({ [P in T]: P } & { [P in U]: never } & { [x: string]: never })[T];
-export type Omit<T, K extends keyof T> = Pick<T, Diff<keyof T, K>>;
