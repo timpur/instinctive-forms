@@ -44,7 +44,7 @@ const setPaths = <TState = TStoreValue>(state: TState, paths: Array<{ path: stri
   return paths.reduce((obj, { path, value }) => StoreUtils.set(obj, path, value), state);
 };
 
-const findPropFormChildren = (
+const findPropInStateRecursive = (
   state: TStoreValue,
   prop: string,
   path: string = null
@@ -57,7 +57,7 @@ const findPropFormChildren = (
       const newPath = path ? `${path}.${stateKey}` : stateKey;
       if (stateKey === prop) return [{ path: newPath, value: state[stateKey] }];
       else if (isObject(state[stateKey])) {
-        return findPropFormChildren(state[stateKey], prop, newPath);
+        return findPropInStateRecursive(state[stateKey], prop, newPath);
       }
     })
     .reduce((result, items) => (items ? [...result, ...items] : result), []);
@@ -68,5 +68,5 @@ export const StoreUtils = {
   set,
   merge,
   setPaths,
-  findPropFormChildren
+  findPropInStateRecursive
 };

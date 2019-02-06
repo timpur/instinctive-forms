@@ -1,6 +1,6 @@
 import { createElement, FunctionComponent } from "react";
 import { create } from "react-test-renderer";
-import { Form, Fieldset } from "./Form";
+import { Form, Fieldset, FormConsumer } from "./Form";
 import { Field } from "./Field";
 import { StoreAdapter } from "../core/StoreAdapter";
 import { TestAdapter } from "../../tests/TestAdapter";
@@ -143,6 +143,8 @@ it("should run validation on form submit", () => {
 
   tree.props.onSubmit();
   expect(onSubmit).toHaveBeenCalled();
+
+  expect(cb).toHaveBeenCalledTimes(2);
   expect(getMockFunctionParam(cb, 2)).toMatchObject({
     errors: ["error"]
   });
@@ -183,4 +185,6 @@ it("should not render more times than expected", () => {
 });
 
 // TODO: test disable change state and validation errors
-// TODO: filters
+// TODO: test filters
+// TODO: test validations at first render
+// TODO: test onchange values ger filtered for "empty" values

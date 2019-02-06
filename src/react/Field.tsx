@@ -1,6 +1,6 @@
 import { createElement, Component, Fragment, ReactNode } from "react";
 import { FormContext, IFormContext } from "./Form";
-import { Callback, TPrimitive, FormValidationType, FormValidations, FormErrors, FormFilters } from "../types";
+import { Callback, TPrimitive, FormErrors, FormFilters, FormValidationEventTypes } from "../types";
 import { getConfig } from "../index";
 import { StoreConnect } from "../core/StoreAdapter";
 import {
@@ -10,9 +10,17 @@ import {
   arrayChanged,
   RenderChildren,
   renderChildrenWithProps,
-  validateNameProp
+  validateNameProp,
+  isEmptyValue
 } from "../helpers";
-import { ERRORS_KEY } from "../constants";
+import {
+  ERRORS_KEY,
+  IFormValidation,
+  IFormValidationProps,
+  setValidationErrorsIfChanged,
+  getValidationErrors,
+  filterFormValidationEvents
+} from "../core/Form";
 
 export interface IFieldChildProps {
   path: string;
@@ -23,18 +31,15 @@ export interface IFieldChildProps {
   onBlur: Callback;
 }
 
-export interface IFieldProps {
+export interface IFieldProps extends IFormValidationProps {
   name: string;
   path?: string;
-  onChangeValidation?: FormValidations;
-  onBlurValidation?: FormValidations;
-  onSubmitValidation?: FormValidations;
   filters?: FormFilters;
   disabled?: boolean;
   children?: RenderChildren<IFieldChildProps, ReactNode>;
 }
 
-export class Field extends Component<IFieldProps, {}> {
+export class Field extends Component<IFieldProps, {}> implements IFormValidation {
   private unsubscribeFromStore: Callback;
   private unsubscribeFromForm: Callback;
 
@@ -44,8 +49,10 @@ export class Field extends Component<IFieldProps, {}> {
     if (!this.context.type) throw new Error("Field must be rendered within a Form.");
     validateNameProp(this.props.name);
     this.connectToStore();
-    const { subscription } = this.context as IFormContext;
-    this.unsubscribeFromForm = subscription.subscribe(event => this.setValidationErrorsIfChanged(event));
+    const { events } = this.context as IFormContext;
+    this.unsubscribeFromForm = events.subscribe(
+      filterFormValidationEvents(e => this.setValidationErrorsIfChanged(e.type))
+    );
   }
 
   componentWillReceiveProps(nextProps: IFieldProps, nextContext: IFormContext) {
@@ -53,7 +60,7 @@ export class Field extends Component<IFieldProps, {}> {
       this.connectToStore(nextProps, nextContext);
     }
     if (this.props.disabled !== nextProps.disabled) {
-      this.setValidationErrorsIfChanged();
+      this.setValidationErrorsIfChanged("runChangeValidation");
     }
   }
 
@@ -86,43 +93,29 @@ export class Field extends Component<IFieldProps, {}> {
   };
 
   onChange = (_value: TPrimitive) => {
+    _value = isEmptyValue(_value) ? null : _value;
     const value = runFilters(this.props.filters, _value);
-    const errors = this.getValidationErrors("onChange", value);
+    const errors = this.getValidationErrors("runChangeValidation", value);
 
     const store = getConfig().storeAdapter;
     store.setPaths([{ path: this.getPath(), value: value }, { path: this.getErrorPath(), value: errors }]);
+
+    const { events } = this.context as IFormContext;
+    events.invoke({ type: "onChange", sender: this, fromValue: "", toValue: value, fromErrors: [], toErrors: errors });
   };
 
   onBlur = () => {
-    this.setValidationErrorsIfChanged("onBlur");
+    this.setValidationErrorsIfChanged("runBlurValidation");
+
+    const { events } = this.context as IFormContext;
+    events.invoke({ type: "onBlur", sender: this, fromErrors: [], toErrors: [] });
   };
 
-  setValidationErrorsIfChanged = (type: FormValidationType = "onChange") => {
-    const store = getConfig().storeAdapter;
-    const value = store.get(this.getPath());
-    const currentErrors = store.get(this.getErrorPath()) as FormErrors;
-    const newErrors = this.getValidationErrors(type, value);
+  setValidationErrorsIfChanged = (eventType: FormValidationEventTypes) =>
+    setValidationErrorsIfChanged(this, this.props, eventType);
 
-    if (arrayChanged(currentErrors, newErrors)) {
-      store.set(this.getErrorPath(), newErrors);
-    }
-  };
-
-  getValidationErrors = (type: FormValidationType, value: TPrimitive) => {
-    const { disabled, onSubmitValidation, onBlurValidation, onChangeValidation } = this.props;
-    const errors: FormErrors = [];
-    if (disabled) return errors;
-
-    switch (type) {
-      case "onSubmit":
-        errors.unshift(...runValidation(onSubmitValidation, value));
-      case "onBlur":
-        errors.unshift(...runValidation(onBlurValidation, value));
-      case "onChange":
-        errors.unshift(...runValidation(onChangeValidation, value));
-    }
-    return errors;
-  };
+  getValidationErrors = (eventType: FormValidationEventTypes, value: TPrimitive) =>
+    getValidationErrors(this.props, eventType, value);
 
   render() {
     const store = getConfig().storeAdapter;

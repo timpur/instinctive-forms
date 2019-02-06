@@ -1,4 +1,4 @@
-import { FormValidation, TPrimitive, FormErrors, FormFilters } from "./types";
+import { FormValidation, TPrimitive, FormErrors, FormFilters, TStoreValue } from "./types";
 
 // ---- Helpers ---- //
 export const isNullOrUndefined = value => value === null || value === undefined;

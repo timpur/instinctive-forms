@@ -148,7 +148,7 @@ describe("clean up of state", () => {
 
 describe("find prop form children", () => {
   it("should find all 'this' props in state", () => {
-    const foundProps = StoreUtils.findPropFormChildren(
+    const foundProps = StoreUtils.findPropInStateRecursive(
       { this: "this", level1: { this: "this", level2: { this: "this" } } },
       "this",
       null

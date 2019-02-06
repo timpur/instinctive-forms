@@ -9,6 +9,13 @@ import { StoreAdapter } from "../core/StoreAdapter";
 const getMockFunctionParam = (fn, call = 1, param = 1) => fn.mock.calls[call - 1][param - 1];
 
 describe("Form", () => {
+  let store: StoreAdapter = null;
+  beforeEach(() => {
+    const testAdapter = new TestAdapter();
+    setup(testAdapter);
+    store = testAdapter;
+  });
+
   it("should render from and children", () => {
     const component = create(
       <Form name="form">
@@ -64,12 +71,12 @@ describe("Form", () => {
     expect(getMockFunctionParam(cb)).toMatchObject({ type: "form", path: "path.form" });
   });
   it("should submit form", () => {
-    const onSubmit = jest.fn();
+    const cb = jest.fn();
     const component = create(
-      <Form name="form" onSubmit={() => onSubmit("userCallback")}>
+      <Form name="form" onSubmit={() => cb("userCallback")}>
         <FormContext.Consumer>
           {props => {
-            props.subscription.subscribe(onSubmit);
+            props.events.subscribe(event => cb(event.type));
             return null;
           }}
         </FormContext.Consumer>
@@ -78,8 +85,10 @@ describe("Form", () => {
     const tree = component.toJSON();
 
     tree.props.onSubmit();
-    expect(onSubmit).toHaveBeenCalledWith("onSubmit");
-    expect(onSubmit).toHaveBeenCalledWith("userCallback");
+    expect(cb).toHaveBeenCalledTimes(3);
+    expect(cb).toHaveBeenCalledWith("runSubmitValidation");
+    expect(cb).toHaveBeenCalledWith("userCallback");
+    expect(cb).toHaveBeenCalledWith("onSubmit");
   });
 });
 
@@ -154,7 +163,7 @@ describe("FieldSet", () => {
         <Fieldset name="fieldset">
           <FormContext.Consumer>
             {props => {
-              props.subscription.subscribe(onSubmit);
+              props.events.subscribe(onSubmit);
               return null;
             }}
           </FormContext.Consumer>
@@ -164,7 +173,9 @@ describe("FieldSet", () => {
     const tree = component.toJSON();
 
     tree.props.onSubmit();
-    expect(onSubmit).toHaveBeenCalledWith("onSubmit");
+
+    expect(onSubmit).toBeCalledTimes(2);
+    expect(getMockFunctionParam(onSubmit, 2)).toMatchObject({ type: "onSubmit" });
   });
 
   it("should unsubscribe from form on unmount", () => {
@@ -176,11 +187,11 @@ describe("FieldSet", () => {
         </Fieldset>
       </Form>
     );
-    const sub: Subscription<any> = getMockFunctionParam(cb).parent.subscription;
-    expect(sub).toBeInstanceOf(Subscription);
-    expect(sub.subscribers).toHaveLength(1);
+    const events: Subscription<any> = getMockFunctionParam(cb).parent.events;
+    expect(events).toBeInstanceOf(Subscription);
+    expect(events.subscribers).toHaveLength(2);
     component.unmount();
-    expect(sub.subscribers).toHaveLength(0);
+    expect(events.subscribers).toHaveLength(0);
   });
 });
 

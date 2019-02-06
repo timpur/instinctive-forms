@@ -8,11 +8,8 @@ import Typography from "@material-ui/core/Typography";
 import Grid from "@material-ui/core/Grid";
 import Paper from "@material-ui/core/Paper";
 
-import { Form, Fieldset, FormConsumer } from "../../../src/react/Form";
-import { Field } from "../../../src/react/Field";
 import { store } from "./store";
-import { Input } from "./form/Input";
-import { validators } from "../../../src/tools/validators";
+import { Form1 } from "./components/Form1";
 
 type ClassNames = "paper";
 const styles: StyleRulesCallback<ClassNames> = theme => ({
@@ -38,16 +35,7 @@ const AppComponent: FunctionComponent<{ classes: ClassNameMap<ClassNames> }> = (
           <Grid container direction="row" justify="space-around" spacing={24}>
             <Grid item xs={12} sm={6} md={4}>
               <Paper className={classes.paper}>
-                <Form name="form">
-                  <Fieldset name="subForm1">
-                    <Input name="test" label="Test Input" />
-                    <Input
-                      name="test_error"
-                      label="Test Error Input"
-                      onChangeValidation={[validators.text("Please only enter text.")]}
-                    />
-                  </Fieldset>
-                </Form>
+                <Form1 />
               </Paper>
             </Grid>
             <Grid item xs={12} sm={6} md={4}>
